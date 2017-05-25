@@ -1,0 +1,4 @@
+#include "Charger.h"
+
+Charger sCharger;
+

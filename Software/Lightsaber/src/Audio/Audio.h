@@ -1,0 +1,50 @@
+#ifndef _AUDIO_H_
+#define _AUDIO_H_
+
+#include "AudioSource.h"
+#include "stm32f10x.h"
+
+#define AMP_CTRL_PORT GPIOA
+#define AMP_CTRL_PIN GPIO_Pin_5
+#define AUDIO_BUF_SIZE 0x100
+#define MAX_AUDIO_SOURCES 3
+
+struct AudioSourceData
+{
+	AudioSourceData() : Src(0), Active(false), Atten(0), Fade(false) {}
+
+	AudioSource* Src;
+	bool Active;
+	uint16_t Atten;
+	bool Fade;
+};
+
+class Audio
+{
+public:
+	Audio();
+	void Init();
+	void LowLevelInit();
+	void SetSamplingFreq(uint32_t freq);
+	void SetAudioAmp(bool en);
+	void SwapBuffer();
+	void Update();
+	int GetFreeAudioSlot();
+	int Play(const char* file, uint16_t atten = 0, bool loop = false);
+	void Stop(int i, bool fade = true);
+	void Atten(int i, uint16_t atten);
+
+private:
+	// DMA transfers
+	bool _refillFlag;
+	uint8_t _activeBuf;
+	uint16_t _buf[2][AUDIO_BUF_SIZE];
+	DMA_InitTypeDef DMA_InitStructure;
+
+	// Audio sources
+	AudioSourceData _srcData[MAX_AUDIO_SOURCES];
+};
+
+extern Audio sAudio;
+
+#endif

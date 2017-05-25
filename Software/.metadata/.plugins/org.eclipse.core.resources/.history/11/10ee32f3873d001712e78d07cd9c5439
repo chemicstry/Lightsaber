@@ -1,0 +1,38 @@
+#include "Power.h"
+#include "../MAX17205/MAX17205.h"
+
+// Global var
+Power sPower;
+
+Power::Power()
+{
+
+}
+
+void Power::Init()
+{
+	// Enable peripheral
+	RCC_APB2PeriphClockCmd(POWER_LATCH_PERIPH, ENABLE);
+
+	// Setup port
+	GPIO_InitTypeDef GPIO_InitStructure;
+	GPIO_InitStructure.GPIO_Pin = POWER_LATCH_PIN;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+	GPIO_Init(POWER_LATCH_PORT, &GPIO_InitStructure);
+
+	GPIO_SetBits(POWER_LATCH_PORT, POWER_LATCH_PIN);
+}
+
+void Power::PowerOff()
+{
+	GPIO_ResetBits(POWER_LATCH_PORT, POWER_LATCH_PIN);
+}
+
+bool Power::CheckOnConditions()
+{
+	if (sBatt.GetSOC() > BATT_EMPTY_SOC)
+		return true;
+	else
+		return false;
+}

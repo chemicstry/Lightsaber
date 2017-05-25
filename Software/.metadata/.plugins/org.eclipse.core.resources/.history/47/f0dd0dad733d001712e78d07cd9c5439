@@ -1,0 +1,130 @@
+#include "Timer.h"
+
+#include <string.h>
+
+uint32_t Timer::millis = 0;
+Event Timer::timers[MAX_TIMERS];
+
+void Timer::Start()
+{
+    memset(Timer::timers, 0, sizeof(Timer::timers));
+    SysTick_Config(SystemCoreClock / 1000);
+}
+
+int32_t Timer::SetTimeout(void (*func)(), int32_t delay_ms)
+{
+    s32 id = Timer::getFreeSlot();
+
+    if (id == NO_TIMER_AVAILABLE)
+        return NO_TIMER_AVAILABLE;
+
+    Timer::timers[id].Type = EVENT_SINGLE;
+    Timer::timers[id].Func = func;
+    Timer::timers[id].Expires = delay_ms;
+
+    return id;
+}
+
+int32_t Timer::SetInterval(void (*func)(), int32_t delay_ms)
+{
+    int32_t id = Timer::getFreeSlot();
+
+    if (id == NO_TIMER_AVAILABLE)
+        return NO_TIMER_AVAILABLE;
+
+    Timer::timers[id].Type = EVENT_INTERVAL;
+    Timer::timers[id].Func = func;
+    Timer::timers[id].Expires = delay_ms;
+    Timer::timers[id].Period = delay_ms;
+
+    return id;
+}
+
+void Timer::ClearTimeout(uint32_t id)
+{
+    if (id >= MAX_TIMERS)
+        return;
+
+    Timer::timers[id].Type = EVENT_NONE;
+}
+
+void Timer::Update(uint32_t diff_ms)
+{
+    for (int32_t i = 0; i < MAX_TIMERS; ++i)
+    {
+        if (Timer::timers[i].Type == EVENT_NONE)
+            continue;
+
+        Timer::timers[i].Expires -= diff_ms;
+    }
+
+    millis += diff_ms;
+}
+
+void Timer::FireCallbacks()
+{
+    for (int32_t i = 0; i < MAX_TIMERS; ++i)
+    {
+        if (Timer::timers[i].Type == EVENT_NONE)
+            continue;
+
+        if (Timer::timers[i].Expires <= 0)
+        {
+            if (Timer::timers[i].Type == EVENT_SINGLE)
+                Timer::timers[i].Type = EVENT_NONE;
+
+            if (Timer::timers[i].Type == EVENT_INTERVAL)
+                Timer::timers[i].Expires += Timer::timers[i].Period;
+
+            Timer::timers[i].Func();
+        }
+    }
+}
+
+uint32_t Timer::Millis()
+{
+    return millis;
+}
+
+uint32_t Timer::Micros()
+{
+    return millis*1000 + (SysTick->LOAD - SysTick->VAL)*1000000/SystemCoreClock;
+}
+
+void DelayMS(uint32_t ms)
+{
+	uint32_t end = Timer::Millis() + ms;
+	while (Timer::Millis() < end) {}
+}
+
+void DelayUS(uint32_t us)
+{
+	uint32_t end = Timer::Micros() + us;
+	while (Timer::Micros() < end) {}
+}
+
+int32_t Timer::getFreeSlot()
+{
+    for (int32_t i = 0; i < MAX_TIMERS; ++i)
+        if (Timer::timers[i].Type == EVENT_NONE)
+            return i;
+
+    return NO_TIMER_AVAILABLE;
+}
+
+uint32_t millis()
+{
+    return Timer::Millis();
+}
+
+uint32_t micros()
+{
+    return Timer::Micros();
+}
+
+extern "C" {
+    void SysTick_Handler(void)
+    {
+        Timer::Update(1);
+    }
+}

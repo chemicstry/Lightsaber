@@ -1,0 +1,123 @@
+#include "Charger.h"
+
+Charger sCharger;
+
+uint16_t ADCBuf[2];
+
+void Charger::Init()
+{
+    // Enable peripherals
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1 | RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOA | RCC_APB2Periph_AFIO, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
+    RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
+
+    // Set ADC clock
+    RCC_ADCCLKConfig(RCC_PCLK2_Div6); //ADCCLK = PCLK22/6 = 72/6=12MHz
+
+    // ADC GPIO Config
+    GPIO_InitTypeDef GPIO_InitStructure;
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;
+    GPIO_Init(GPIOC, &GPIO_InitStructure);
+
+    // ADC DMA Config
+    DMA_InitTypeDef   DMA_InitStructure;
+    DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t) &ADC1->DR;
+    DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)&ADCBuf;
+    DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;
+    DMA_InitStructure.DMA_BufferSize = 2;
+    DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+    DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
+    DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
+    DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
+    DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
+    DMA_InitStructure.DMA_Priority = DMA_Priority_Medium;
+    DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;
+    DMA_Init(DMA1_Channel1, &DMA_InitStructure);
+
+    // Enable DMA
+    DMA_Cmd(DMA1_Channel1, ENABLE);
+
+    // ADC Config
+    ADC_InitTypeDef ADC_InitStructure;
+    ADC_InitStructure.ADC_Mode = ADC_Mode_Independent; //Independent conversion mode (single)
+    ADC_InitStructure.ADC_ScanConvMode = ENABLE; // Convert sequentially
+    ADC_InitStructure.ADC_ContinuousConvMode = ENABLE; // Convert continuously
+    ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_None; // No external triggering
+    ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right; // Right 12-bit data alignment
+    ADC_InitStructure.ADC_NbrOfChannel = 2; // 2 channel conversion
+    ADC_Init(ADC1, &ADC_InitStructure);
+
+    // Init both channels
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_10, 1, ADC_SampleTime_239Cycles5);
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_11, 2, ADC_SampleTime_239Cycles5);
+
+    // Enable ADC1 DMA
+    ADC_DMACmd(ADC1, ENABLE);
+
+    // Enable ADC1
+    ADC_Cmd(ADC1, ENABLE); //Enable ADC1
+
+    // Reset calibration
+    ADC_ResetCalibration(ADC1);
+
+    // Wait for completion
+    while(ADC_GetResetCalibrationStatus(ADC1));
+
+    // Start ADC1 calibration
+    ADC_StartCalibration(ADC1);
+
+    // Wait for calibration to complete
+    while(ADC_GetCalibrationStatus(ADC1));
+
+    // Start conversion
+    ADC_SoftwareStartConvCmd(ADC1, ENABLE);
+
+    // PWM GPIO Config
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
+	GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);
+	GPIO_PinRemapConfig(GPIO_FullRemap_TIM2, ENABLE);
+
+	// Config PWM Timer Time Base
+	TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure;
+	TIM_TimeBaseStructInit(&TIM_TimeBaseInitStructure);
+	TIM_TimeBaseInitStructure.TIM_Prescaler = 1;
+	TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
+	TIM_TimeBaseInitStructure.TIM_Period = SystemCoreClock/CHARGER_BOOST_FREQ;
+	TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+	TIM_TimeBaseInitStructure.TIM_RepetitionCounter = 0;
+	TIM_TimeBaseInit(TIM2, &TIM_TimeBaseInitStructure);
+
+	// Configure PWM Output Channel
+	TIM_OCInitTypeDef TIM_OCInitStructure;
+	TIM_OCStructInit(&TIM_OCInitStructure);
+	TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
+	TIM_OCInitStructure.TIM_Pulse = 5;
+	TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
+	TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;
+	TIM_OC1Init(TIM2, &TIM_OCInitStructure);
+
+	// Preload config
+	TIM_OC1PreloadConfig(TIM2, TIM_OCPreload_Enable);
+
+	TIM_ARRPreloadConfig(TIM2, ENABLE);
+	//TIM_CtrlPWMOutputs(TIM2, ENABLE);
+
+	// Enable Timer
+	TIM_Cmd(TIM2, ENABLE);
+}
+
+float Charger::GetCurrent()
+{
+	return float(ADCBuf[0]) / 4095.0f * 3.3f / CHARGER_CURRENT_SHUNT;
+}
+
+float Charger::GetVoltage()
+{
+	//return float(ADCBuf[1]) / 4095.0f * 3.3f * 2.0f;
+	return ADCBuf[1];
+}
+

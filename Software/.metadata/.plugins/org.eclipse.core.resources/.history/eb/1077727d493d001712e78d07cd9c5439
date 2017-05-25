@@ -1,0 +1,6 @@
+#include "Audio.h"
+
+
+
+// Global vairable
+Audio sAudio;

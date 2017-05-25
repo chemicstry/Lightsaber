@@ -1,0 +1,42 @@
+#ifndef _MAX17205_H_
+#define _MAX17205_H_
+
+#include "../I2Cdev/I2Cdev.h"
+
+#define MAX17205_ADDR_LOW 0x36
+#define MAX17205_ADDR_HIGH 0x0B
+
+#define RSENSE 0.01f
+#define RCOEF 1.0f/RSENSE
+
+enum MAX17205_Registers
+{
+	REG_RepCap				= 0x005, // Filtered capacity
+	REG_RepSOC				= 0x006, // Filtered SOC
+	REG_Current				= 0x00A, // Real time current
+	REG_AvgCurrent			= 0x00B, // Filtered current
+	REG_DevName				= 0x021, // Device Name
+	REG_Batt				= 0x0DA, // Battery voltage
+	REG_IntTemp				= 0x135, // Internal temperature
+	REG_nRSense				= 0x1CF, // Current sense resistor value
+};
+
+class MAX17205
+{
+public:
+    void Init();
+
+    float GetInternalTemp();
+    float GetBatteryVoltage();
+    float GetCap(); // mAh
+    float GetSOC(); // %
+    float GetCurrent(); // mA
+
+private:
+    uint16_t ReadReg(uint16_t reg);
+    void WriteReg(uint16_t reg, uint16_t val);
+};
+
+extern MAX17205 sBatt;
+
+#endif

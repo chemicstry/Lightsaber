@@ -1,0 +1,9 @@
+#ifndef _AUDIO_SOURCE_H_
+#define _AUDIO_SOURCE_H_
+
+class AudioSource
+{
+
+};
+
+#endif

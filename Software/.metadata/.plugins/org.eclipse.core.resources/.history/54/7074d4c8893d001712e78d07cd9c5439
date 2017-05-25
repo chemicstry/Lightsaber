@@ -1,0 +1,73 @@
+#include "Power.h"
+#include "../MAX17205/MAX17205.h"
+
+// Global var
+Power sPower;
+
+Power::Power()
+{
+
+}
+
+void Power::Init()
+{
+	// Enable peripheral
+	RCC_APB2PeriphClockCmd(POWER_LATCH_PERIPH, ENABLE);
+
+	// Setup port
+	GPIO_InitTypeDef GPIO_InitStructure;
+	GPIO_InitStructure.GPIO_Pin = POWER_LATCH_PIN;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+	GPIO_Init(POWER_LATCH_PORT, &GPIO_InitStructure);
+
+	GPIO_SetBits(POWER_LATCH_PORT, POWER_LATCH_PIN);
+}
+
+void Power::InitWatchdog()
+{
+	// Enable Watchdog peripheral
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_WWDG, ENABLE);
+
+	// On Value line devices, WWDG clock counter = (PCLK1 (24MHz)/4096)/8 = 732 Hz (~1366 us)
+	// On other devices, WWDG clock counter = (PCLK1(36MHz)/4096)/8 = 1099 Hz (~910 us)
+	WWDG_SetPrescaler(WWDG_Prescaler_8);
+
+	  /* Set Window value to 80; WWDG counter should be refreshed only when the counter
+	    is below 80 (and greater than 64) otherwise a reset will be generated */
+	  WWDG_SetWindowValue(80);
+
+	  /* - On Value line devices,
+	    Enable WWDG and set counter value to 127, WWDG timeout = ~1366 us * 64 = 87.42 ms
+	    In this case the refresh window is: ~1366us * (127-80) = 64.20 ms < refresh window < ~1366us * 64 = 87.42ms
+	     - On other devices
+	    Enable WWDG and set counter value to 127, WWDG timeout = ~910 us * 64 = 58.25 ms
+	    In this case the refresh window is: ~910 us * (127-80) = 42.77 ms < refresh window < ~910 us * 64 = 58.25ms
+	  */
+	  WWDG_Enable(127);
+}
+
+void Power::PowerOff()
+{
+	GPIO_ResetBits(POWER_LATCH_PORT, POWER_LATCH_PIN);
+}
+
+bool Power::CheckOnConditions()
+{
+	if (sBatt.GetSOC() < BATT_EMPTY_SOC)
+	{
+		sLed.Blink(RGB(255, 0, 0));
+		return false;
+	}
+
+	// Check if there was a watchdog reset and alert
+	if (RCC_GetFlagStatus(RCC_FLAG_IWDGRST) != RESET)
+	{
+		sLed.Blink(RGB(255, 255, 0), 10, 100);
+
+		// Clear flag
+		RCC_ClearFlag();
+	}
+
+	return true;
+}

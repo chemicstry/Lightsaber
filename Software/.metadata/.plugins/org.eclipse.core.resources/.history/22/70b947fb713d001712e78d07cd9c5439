@@ -1,0 +1,18 @@
+#include "Power.h"
+#include "../MAX17205/MAX17205.h"
+
+// Global var
+Power sPower;
+
+Power::Power()
+{
+
+}
+
+bool Power::CheckOnConditions()
+{
+	if (sBatt.GetSOC() > 5.0f)
+		return true;
+	else
+		return false;
+}

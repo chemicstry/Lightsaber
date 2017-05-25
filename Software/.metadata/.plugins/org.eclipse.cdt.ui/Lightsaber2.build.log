@@ -1,0 +1,33 @@
+16:07:36 **** Incremental Build of configuration Debug for project Lightsaber2 ****
+make all 
+Building file: ../src/main.cpp
+Invoking: Cross ARM C++ Compiler
+arm-none-eabi-g++ -mcpu=cortex-m3 -mthumb -Og -fmessage-length=0 -fsigned-char -ffunction-sections -fdata-sections -fno-move-loop-invariants -Wall -Wextra  -g3 -DDEBUG -DUSE_FULL_ASSERT -DOS_USE_SEMIHOSTING -DTRACE -DOS_USE_TRACE_SEMIHOSTING_DEBUG -DSTM32F10X_HD -DUSE_STDPERIPH_DRIVER -DHSE_VALUE=8000000 -I"../include" -I"../system/include" -I"../system/include/cmsis" -I"../system/include/stm32f1-stdperiph" -std=gnu++11 -fabi-version=0 -fno-exceptions -fno-rtti -fno-use-cxa-atexit -fno-threadsafe-statics -MMD -MP -MF"src/main.d" -MT"src/main.d" -c -o "src/main.o" "../src/main.cpp"
+In file included from ../src/main.cpp:18:0:
+../src/MAX17205/MAX17205.h:37:8: note: offset of packed bit-field 'FilterCfg::MIX' has changed in GCC 4.4
+ struct FilterCfg
+        ^
+../src/main.cpp: In function 'void SaveConfig()':
+../src/main.cpp:259:7: warning: unused variable 'size' [-Wunused-variable]
+  UINT size;
+       ^
+Finished building: ../src/main.cpp
+ 
+Building target: Lightsaber2.elf
+Invoking: Cross ARM C++ Linker
+arm-none-eabi-g++ -mcpu=cortex-m3 -mthumb -Og -fmessage-length=0 -fsigned-char -ffunction-sections -fdata-sections -fno-move-loop-invariants -Wall -Wextra  -g3 -T mem.ld -T libs.ld -T sections.ld -nostartfiles -Xlinker --gc-sections -L"../ldscripts" -Wl,-Map,"Lightsaber2.map" --specs=nano.specs -u _printf_float -o "Lightsaber2.elf"  ./system/src/stm32f1-stdperiph/misc.o ./system/src/stm32f1-stdperiph/stm32f10x_adc.o ./system/src/stm32f1-stdperiph/stm32f10x_dac.o ./system/src/stm32f1-stdperiph/stm32f10x_dma.o ./system/src/stm32f1-stdperiph/stm32f10x_gpio.o ./system/src/stm32f1-stdperiph/stm32f10x_i2c.o ./system/src/stm32f1-stdperiph/stm32f10x_rcc.o ./system/src/stm32f1-stdperiph/stm32f10x_sdio.o ./system/src/stm32f1-stdperiph/stm32f10x_tim.o ./system/src/stm32f1-stdperiph/stm32f10x_usart.o  ./system/src/newlib/_cxx.o ./system/src/newlib/_exit.o ./system/src/newlib/_sbrk.o ./system/src/newlib/_startup.o ./system/src/newlib/_syscalls.o ./system/src/newlib/assert.o  ./system/src/diag/Trace.o ./system/src/diag/trace_impl.o  ./system/src/cortexm/_initialize_hardware.o ./system/src/cortexm/_reset_hardware.o ./system/src/cortexm/exception_handlers.o  ./system/src/cmsis/system_stm32f10x.o ./system/src/cmsis/vectors_stm32f10x.o  ./src/sdcard/sdcard.o  ./src/fatfs/fatfs_diskio.o ./src/fatfs/ff.o  ./src/Timer/Timer.o  ./src/Power/Charger.o ./src/Power/Power.o  ./src/MPU6050/MPU6050.o  ./src/MAX17205/MAX17205.o  ./src/LED/LED.o ./src/LED/RGBConverter.o  ./src/I2Cdev/I2C.o ./src/I2Cdev/I2Cdev.o  ./src/Button/Button.o  ./src/BT/BT.o  ./src/Audio/Audio.o ./src/Audio/WAV.o  ./src/_write.o ./src/main.o   
+Finished building target: Lightsaber2.elf
+ 
+Invoking: Cross ARM GNU Create Flash Image
+arm-none-eabi-objcopy -O ihex "Lightsaber2.elf"  "Lightsaber2.hex"
+Finished building: Lightsaber2.hex
+ 
+Invoking: Cross ARM GNU Print Size
+arm-none-eabi-size --format=berkeley "Lightsaber2.elf"
+   text	   data	    bss	    dec	    hex	filename
+  26113	    272	   2564	  28949	   7115	Lightsaber2.elf
+Finished building: Lightsaber2.siz
+ 
+
+16:07:37 Build Finished (took 1s.445ms)
+

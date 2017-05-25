@@ -1,0 +1,324 @@
+//
+// This file is part of the GNU ARM Eclipse distribution.
+// Copyright (c) 2014 Liviu Ionescu.
+//
+
+// ----------------------------------------------------------------------------
+
+#include <stdio.h>
+#include <stdlib.h>
+#include "diag/Trace.h"
+
+#include "stm32f10x.h"
+
+#include "Timer/Timer.h"
+#include "I2Cdev/I2C.h"
+#include "I2Cdev/I2Cdev.h"
+#include "MPU6050/MPU6050.h"
+#include "MAX17205/MAX17205.h"
+#include "LED/LED.h"
+#include "BT/BT.h"
+#include "fatfs/ff.h"
+#include "Audio/Audio.h"
+#include "Power/Power.h"
+#include "Button/Button.h"
+
+
+// ----------------------------------------------------------------------------
+//
+// Semihosting STM32F1 empty sample (trace via DEBUG).
+//
+// Trace support is enabled by adding the TRACE macro definition.
+// By default the trace messages are forwarded to the DEBUG output,
+// but can be rerouted to any device or completely suppressed, by
+// changing the definitions required in system/src/diag/trace_impl.c
+// (currently OS_USE_TRACE_ITM, OS_USE_TRACE_SEMIHOSTING_DEBUG/_STDOUT).
+//
+
+// ----- main() ---------------------------------------------------------------
+
+// Sample pragmas to cope with warnings. Please note the related line at
+// the end of this function, used to pop the compiler diagnostics status.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wmissing-declarations"
+#pragma GCC diagnostic ignored "-Wreturn-type"
+
+MPU6050 gyro;
+
+int16_t ax, ay, az;
+int16_t gx, gy, gz;
+
+void Test()
+{
+    static double h = 0;
+    //trace_printf("Testcon: %u\n", gyro.getRate());
+    gyro.getAcceleration(&ax, &ay, &az);
+    //trace_printf("%i, %i, %i\n", ax, ay, az);
+    h += (double(ay)/65025.0 + 0.5 - h)*0.1;
+    sLed.Set(HSL(h, 1, 0.5));
+}
+
+#define STEP 128
+
+void LEDPWM()
+{
+    static double h = 0;
+
+    if (h >= 1.0)
+        h = 0;
+    else
+        h += 0.01;
+
+    sLed.Set(HSL(h, 1, 0.5));
+}
+
+void BTTEST()
+{
+    BT& bt = BT::getInstance();
+    bt.Send("AT\r\n");
+
+}
+
+void BTTEST2()
+{
+    BT& bt = BT::getInstance();
+}
+
+void BTRX(uint8_t* data, uint32_t len)
+{
+	trace_printf("BTRX: %u\n", len);
+
+	switch(data[0])
+	{
+	case 'R':
+		sLed.Set(RGB(255, 0, 0));
+		break;
+	case 'G':
+		sLed.Set(RGB(0, 255, 0));
+		break;
+	case 'B':
+		sLed.Set(RGB(0, 0, 255));
+		break;
+	default:
+		sLed.Set(RGB(0, 0, 0));
+	}
+}
+
+FRESULT scan_files (
+    char* path        /* Start node to be scanned (***also used as work area***) */
+)
+{
+    FRESULT res;
+    DIR dir;
+    UINT i;
+    static FILINFO fno;
+
+
+    res = f_opendir(&dir, path);                       /* Open the directory */
+    if (res == FR_OK) {
+        for (;;) {
+            res = f_readdir(&dir, &fno);                   /* Read a directory item */
+            if (res != FR_OK || fno.fname[0] == 0) break;  /* Break on error or end of dir */
+            if (fno.fattrib & AM_DIR) {                    /* It is a directory */
+                i = strlen(path);
+                sprintf(&path[i], "/%s", fno.fname);
+                res = scan_files(path);                    /* Enter the directory */
+                if (res != FR_OK) break;
+                path[i] = 0;
+            } else {                                       /* It is a file. */
+            	trace_printf("%s/%s\n", path, fno.fname);
+            }
+        }
+        f_closedir(&dir);
+    }
+
+    return res;
+}
+
+bool CheckI2CAddress(I2C_TypeDef* I2Cx, uint8_t slaveAddress)
+{
+	// Wait until I2C module is idle:
+	//while(I2C_GetFlagStatus(I2Cx, I2C_FLAG_BUSY));
+
+	// Generate the start condition
+	I2C_GenerateSTART(I2Cx, ENABLE);
+	//
+	while(!I2C_CheckEvent(I2Cx, I2C_EVENT_MASTER_MODE_SELECT));
+
+	//Send the address of the slave to be contacted:
+	I2C_Send7bitAddress(I2Cx, slaveAddress<<1, I2C_Direction_Transmitter);
+
+	//If this is a write operation, set I2C for transmit
+	uint32_t timeout = 0xFFF;
+	while (!I2C_CheckEvent(I2Cx, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED))
+	{
+		if (--timeout == 0)
+			break;
+	}
+
+	if (timeout == 0)
+		return false;
+	else
+		return true;
+}
+
+uint32_t hum;
+
+void PlayHum()
+{
+	hum = sAudio.Play("hum32k.wav", 1, true);
+}
+
+void PowerOff()
+{
+	sPower.PowerOff();
+}
+
+int main(int argc, char* argv[])
+{
+	// Quickly latch power
+	sPower.Init();
+
+    // At this stage the system clock should have already been configured
+    // at high speed.
+
+    //trace_printf("System clock: %u Hz\n", SystemCoreClock);
+    Timer::Start();
+
+    // Init leds early to prevent partial mosfet conduction
+    sLed.Init();
+
+    //trace_printf("I2C Init\n");
+    I2C1_Initialize();
+
+    // Init battery monitor
+    sBatt.Init();
+
+    //trace_printf("SOC: %.2f\n", sBatt.GetSOC());
+
+    // Power manager will turn off device if conidtions are not met
+    sPower.CheckOnConditions();
+
+    // Main button
+    Button btn(RCC_APB2Periph_GPIOA, GPIOA, GPIO_Pin_6, false, false, 20);
+
+
+    // Initialize file system
+    FATFS fs;
+	FIL fil;
+	char line[82];
+	FRESULT fr;
+
+	int status = f_mount(&fs, "0", 1);
+
+	if (status != FR_OK)
+	{
+		trace_printf("Mount failed! %u\n", status);
+		sLed.Blink(RGB(255, 0, 0));
+		sPower.PowerOff();
+	}
+
+	// Init audio
+	sAudio.Init();
+
+	// Play turn on sound
+	sAudio.Play("2on32k.wav", 2);
+
+	// Start hum after delay
+	Timer::SetTimeout(PlayHum, 500);
+
+	// Lights on!
+	sLed.Set(RGB(0, 0, 20));
+
+    while(1)
+    {
+        Timer::FireCallbacks();
+        BT::getInstance().Update();
+        sAudio.Update();
+        btn.read();
+
+        if (btn.wasPressed())
+        {
+        	sAudio.Stop(hum);
+        	Timer::SetTimeout(PowerOff, 300);
+        }
+    }
+
+    return 0;
+}
+
+/*
+ 	 trace_printf("I2C Init\n");
+    //led.SetVal(255, 255, 255);
+
+    I2C1_Initialize();
+
+    for (int i = 0; i < 0x7F; ++i)
+    {
+    	if (CheckI2CAddress(I2C1, i))
+    		trace_printf("Addr: %u\n", i);
+    }
+
+    gyro.initialize();
+    BT::getInstance().Init();
+    BT::getInstance().SetRXCB(BTRX);
+    BT::getInstance().SetCMDMode(false);
+
+    trace_printf("Waiting\n");
+
+    trace_printf("Testcon: %u\n", gyro.getDeviceID());
+
+    sLed.Init();
+    //Timer::SetInterval(Test, 10);
+    //Timer::SetInterval(LEDPWM, 10);
+    //Timer::SetInterval(BTTEST, 1000);
+    //Timer::SetInterval(BTTEST2, 1200);
+
+    MAX17205 max;
+    uint16_t devName = max.ReadReg(0x21);
+    trace_printf("DevName: %u\nName: %u\nRev: %u\n", devName, devName & 0xF, devName >> 4);
+
+    float temp = max.GetInternalTemp();
+    trace_printf("Temp: %.1f\n", temp);
+
+    float vol = max.GetBatteryVoltage();
+    trace_printf("Voltage: %.3f\n", vol);
+
+    FATFS fs;
+	FIL fil;
+	char line[82];
+	FRESULT fr;
+
+	int status = f_mount(&fs, "0", 1);
+
+	if (status != FR_OK)
+	{
+		trace_printf("Mount failed! %u\n", status);
+		return 0;
+	}
+
+	// Open file
+	fr = f_open(&fil, "hello.txt", FA_READ);
+	if (fr) return (int)fr;
+
+	// Read all lines
+	while (f_gets(line, sizeof(line), &fil))
+		trace_printf(line);
+
+	// Close file
+	f_close(&fil);
+
+	//char path[] = "/";
+	//scan_files(path);
+
+	sAudio.Init();
+	sAudio.Play("2on32k.wav", 2);
+	//sAudio.Play("bee32k.wav");
+	Timer::SetTimeout(HUM, 1000);
+	Timer::SetInterval(SWING, 5000);
+ */
+
+#pragma GCC diagnostic pop
+
+// ----------------------------------------------------------------------------

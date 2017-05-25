@@ -1,0 +1,8 @@
+#include "Charger.h"
+
+Charger sCharger;
+
+void Charger::Init()
+{
+
+}

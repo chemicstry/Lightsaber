@@ -1,0 +1,71 @@
+#include "Power.h"
+#include "Charger.h"
+#include "../MAX17205/MAX17205.h"
+#include "../LED/LED.h"
+#include "diag/trace.h"
+
+// Global var
+Power sPower;
+
+Power::Power()
+{
+
+}
+
+void Power::Init()
+{
+	// Enable peripheral
+	RCC_APB2PeriphClockCmd(POWER_LATCH_PERIPH, ENABLE);
+
+	// Setup port
+	GPIO_InitTypeDef GPIO_InitStructure;
+	GPIO_InitStructure.GPIO_Pin = POWER_LATCH_PIN;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+	GPIO_Init(POWER_LATCH_PORT, &GPIO_InitStructure);
+
+	GPIO_SetBits(POWER_LATCH_PORT, POWER_LATCH_PIN);
+
+	// Init charger
+	//sCharger.Init();
+
+	Timer::SetInterval([](){
+		trace_printf("CHG U: %.3f V, I: %.3f A\n", sCharger.GetVoltage(), sCharger.GetCurrent());
+	}, 1000);
+}
+
+void Power::InitWatchdog()
+{
+}
+
+void Power::PowerOff()
+{
+	// Disable leds
+	sLed.Set(RGB(0, 0, 0));
+
+	// Turn off power supply
+	GPIO_ResetBits(POWER_LATCH_PORT, POWER_LATCH_PIN);
+
+	// Wait for caps to discharge
+	while (1) {}
+}
+
+bool Power::CheckOnConditions()
+{
+	if (sBatt.GetSOC() < BATT_EMPTY_SOC)
+	{
+		sLed.Blink(RGB(255, 0, 0));
+		//PowerOff();
+	}
+
+	// Check if there was a watchdog reset and alert
+	if (RCC_GetFlagStatus(RCC_FLAG_WWDGRST) != RESET)
+	{
+		sLed.Blink(RGB(255, 255, 0), 10, 100);
+
+		// Clear flag
+		RCC_ClearFlag();
+	}
+
+	return true;
+}

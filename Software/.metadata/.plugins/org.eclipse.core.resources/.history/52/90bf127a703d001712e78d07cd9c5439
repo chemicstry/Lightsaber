@@ -1,0 +1,32 @@
+#ifndef _MAX17205_H_
+#define _MAX17205_H_
+
+#include "../I2Cdev/I2Cdev.h"
+
+#define MAX17205_ADDR_LOW 0x36
+#define MAX17205_ADDR_HIGH 0x0B
+
+enum MAX17205_Registers
+{
+	REG_DevName				= 0x21,
+	REG_Batt				= 0xDA,
+	REG_IntTemp				= 0x135
+};
+
+class MAX17205
+{
+public:
+    void Init();
+
+    float GetInternalTemp();
+    float GetBatteryVoltage();
+    float GetSOC();
+
+//private:
+    uint16_t ReadReg(uint16_t reg);
+    void WriteReg(uint16_t reg, uint16_t val);
+};
+
+extern MAX17205 sBatt;
+
+#endif

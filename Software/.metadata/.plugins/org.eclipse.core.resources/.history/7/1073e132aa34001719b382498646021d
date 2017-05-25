@@ -1,0 +1,25 @@
+#include "MAX17205.h"
+
+void MAX17205::Init()
+{
+}
+
+uint16_t MAX17205::ReadReg(uint16_t reg)
+{
+	uint16_t val;
+
+	if (reg > 0xFF)
+		I2Cdev::readWord(MAX17205_ADDR_HIGH, reg >> 8, &val);
+	else
+		I2Cdev::readWord(MAX17205_ADDR_LOW, reg, &val);
+
+	return val;
+}
+
+void MAX17205::WriteReg(uint16_t reg, uint16_t val)
+{
+	if (reg > 0xFF)
+		I2Cdev::writeWord(MAX17205_ADDR_HIGH, reg >> 8, val);
+	else
+		I2Cdev::writeWord(MAX17205_ADDR_LOW, reg, val);
+}

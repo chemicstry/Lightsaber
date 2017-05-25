@@ -1,0 +1,12 @@
+#ifndef _POWER_H_
+#define _POWER_H_
+
+class Power
+{
+public:
+	Power()
+};
+
+extern Power sPower;
+
+#endif

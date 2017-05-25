@@ -1,0 +1,124 @@
+#include "Audio.h"
+
+// Global vairable
+Audio sAudio;
+
+Audio::Audio(): _activeBuf(0), _refillFlag(false)
+{
+
+}
+
+void Audio::Init()
+{
+	LowLevelInit();
+	SetAudioAmp(true);
+}
+
+void Audio::LowLevelInit()
+{
+	// Enable DMA2
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA2, ENABLE);
+    // Enable GPIOA
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+    // Enable DAC
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC, ENABLE);
+    // Enable TIM6
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM6, ENABLE);
+
+    GPIO_InitTypeDef GPIO_InitStructure;
+	GPIO_InitStructure.GPIO_Pin =  AMP_CTRL_PIN;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+	GPIO_Init(AMP_CTRL_PORT, &GPIO_InitStructure);
+
+	// TIM6 Configuration
+	TIM_PrescalerConfig(TIM6, 0, TIM_PSCReloadMode_Update);
+	SetSamplingFreq(32000);
+
+	// TIM6 TRGO selection
+	TIM_SelectOutputTrigger(TIM6, TIM_TRGOSource_Update);
+
+	// DAC channel1 Configuration
+	DAC_InitTypeDef DAC_InitStructure;
+	DAC_InitStructure.DAC_Trigger = DAC_Trigger_T6_TRGO;
+	DAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;
+	DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Enable;
+	DAC_Init(DAC_Channel_1, &DAC_InitStructure);
+
+	DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&DAC->DHR12R1;
+	DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)_buf[_activeBuf];
+	DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralDST;
+	DMA_InitStructure.DMA_BufferSize = AUDIO_BUF_SIZE;
+	DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+	DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
+	DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
+	DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
+	DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;
+	DMA_InitStructure.DMA_Priority = DMA_Priority_High;
+	DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;
+	DMA_Init(DMA2_Channel3, &DMA_InitStructure);
+
+	// Enable DMA interrupt
+	DMA_ITConfig(DMA2_Channel3, DMA_IT_TC, ENABLE);
+
+	// Enable DMA2 Channel3
+	DMA_Cmd(DMA2_Channel3, ENABLE);
+
+	// Enable DAC Channel1: Once the DAC channel1 is enabled, PA.04 is automatically connected to the DAC converter.
+	DAC_Cmd(DAC_Channel_1, ENABLE);
+
+	// Enable DMA for DAC Channel1
+	DAC_DMACmd(DAC_Channel_1, ENABLE);
+
+	// TIM6 enable counter
+	TIM_Cmd(TIM6, ENABLE);
+
+	// Enable interrupt in NVIC
+	NVIC_EnableIRQ(DMA2_Channel3_IRQn);
+}
+
+void Audio::SetSamplingFreq(uint32_t freq)
+{
+	TIM_SetAutoreload(TIM6, SystemCoreClock/freq - 1);
+}
+
+void Audio::SetAudioAmp(bool en)
+{
+	if (en)
+		GPIO_SetBits(AMP_CTRL_PORT, AMP_CTRL_PIN);
+	else
+		GPIO_ResetBits(AMP_CTRL_PORT, AMP_CTRL_PIN);
+}
+
+void Audio::SwapBuffer()
+{
+	// Stop DMA
+	DMA_DeInit(DMA2_Channel3);
+
+	// Change active buffer
+	_activeBuf ^= 1;
+	DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)_buf[_activeBuf];
+
+	//DMA_ITConfig(DMA2_Channel3, DMA_IT_TC, ENABLE);
+
+	// Init DMA with new params
+	DMA_Init(DMA2_Channel3, &DMA_InitStructure);
+
+	// Start DMA
+	DMA_Cmd(DMA2_Channel3, ENABLE);
+
+	CurrentBuf ^= 1;
+	wav->Read(&AudioBuf[CurrentBuf], AudioBufSize);
+}
+
+extern "C" void  DMA2_Channel3_IRQHandler(void)
+{
+	// DMA Transfer Complete
+	if (DMA_GetITStatus(DMA2_IT_TC3) != RESET)
+	{
+		// Clear interrupt flag
+		DMA_ClearITPendingBit(DMA2_IT_TC3);
+
+		// Swap buffer
+		sAudio.SwapBuffer();
+	}
+}

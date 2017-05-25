@@ -1,0 +1,101 @@
+#include "MAX17205.h"
+
+#include "diag/trace.h"
+
+void MAX17205::Init()
+{
+	// Initialize pack config
+	PackCfg pcfg;
+	pcfg.NCELLS = 3;
+	pcfg.D4 = 0;
+	pcfg.BALCFG = 5; // 40mV diff
+	pcfg.CxEn = false;
+	pcfg.BtEn = false;
+	pcfg.ChEn = true;
+	pcfg.TdEn = true;
+	pcfg.A1En = false;
+	pcfg.A2En = false;
+	pcfg.D14 = 0;
+	pcfg.FGT = false;
+
+	// Cast to 2 byte register
+	uint16_t reg;
+	memcpy(&reg, &pcfg, sizeof(PackCfg));
+
+	// Read current value
+	uint16_t val = sBatt.ReadReg(REG_PackCfg);
+
+	// If values do no match write and reset fuel gauge
+	if (reg != val)
+	{
+		trace_printf("Wrong fuel gauge settings detected!\nDetected: %#04X, New: %#04X\nInitializing...\n", val, reg);
+
+		sBatt.WriteReg(REG_PackCfg, reg);
+		FuelGaugeReset();
+	}
+}
+
+void MAX17205::FuelGaugeReset()
+{
+	WriteReg(REG_Config2, 0x0001);
+}
+
+float MAX17205::GetInternalTemp()
+{
+	return (float(ReadReg(REG_IntTemp))*0.1f)-273.0f;
+}
+
+float MAX17205::GetVoltage()
+{
+	return float(ReadReg(REG_Batt))*0.00125f;
+}
+
+float MAX17205::GetCellVoltage(uint8_t cell)
+{
+	if (cell > 4)
+		return 0.0f;
+
+	return float(ReadReg(REG_Cell1-cell))*0.000078125f;
+}
+
+float MAX17205::GetCap()
+{
+	return float(ReadReg(REG_RepCap))*0.005f*RCOEF;
+}
+
+float MAX17205::GetSOC()
+{
+	return float(ReadReg(REG_RepSOC))/256.0f;
+}
+
+float MAX17205::GetCurrent()
+{
+	return float(int16_t(ReadReg(REG_Current)))*0.0015625f*RCOEF;
+}
+
+float MAX17205::GetAvgCurrent()
+{
+	return float(int16_t(ReadReg(REG_AvgCurrent)))*0.0015625f*RCOEF;
+}
+
+uint16_t MAX17205::ReadReg(uint16_t reg)
+{
+	uint16_t val;
+
+	if (reg > 0xFF)
+		I2Cdev::readWord(MAX17205_ADDR_HIGH, reg & 0xFF, &val);
+	else
+		I2Cdev::readWord(MAX17205_ADDR_LOW, reg, &val);
+
+	return val;
+}
+
+void MAX17205::WriteReg(uint16_t reg, uint16_t val)
+{
+	if (reg > 0xFF)
+		I2Cdev::writeWord(MAX17205_ADDR_HIGH, reg & 0xFF, val);
+	else
+		I2Cdev::writeWord(MAX17205_ADDR_LOW, reg, val);
+}
+
+MAX17205 sBatt;

@@ -1,0 +1,43 @@
+EESchema-LIBRARY Version 2.3
+#encoding utf-8
+#(c) SnapEDA 2016 (snapeda.com)
+#This work is licensed under a Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA) with Design Exception 1.0
+#
+# MPU-6050
+#
+DEF MPU-6050 U 0 40 Y Y 1 L N
+F0 "U" -500 650 50 H V L CNN
+F1 "MPU-6050" -500 -800 50 H V L CNN
+F2 "QFN50P400X400X95-25N" 0 0 50 H I L CNN
+F3 "3-axis gyroscope, 3-axis accelerometer in a 4x4x0.9 housing" 0 0 50 H I L CNN "Description"
+F4 "InvenSense" 0 0 50 H I L CNN "MF"
+F5 "7.10 USD" 0 0 50 H I L CNN "Price"
+F6 "Good" 0 0 50 H I L CNN "Availability"
+F7 "MPU-6050" 0 0 50 H I L CNN "MP"
+F8 "QFN-24 InvenSense" 0 0 50 H I L CNN "Package"
+DRAW
+P 2 0 0 10 -500 -700 500 -700 N
+P 2 0 0 10 500 -700 500 600 N
+P 2 0 0 10 500 600 -500 600 N
+P 2 0 0 10 -500 600 -500 -700 N
+X CLKIN 1 -600 500 100 R 40 40 0 0 I 
+X AUX_CL 7 -600 400 100 R 40 40 0 0 I 
+X AD0 9 -600 300 100 R 40 40 0 0 I 
+X FSYNC 11 -600 100 100 R 40 40 0 0 I 
+X SCL 23 -600 -100 100 R 40 40 0 0 I C
+X AUX_DA 6 -600 -400 100 R 40 40 0 0 B 
+X SDA 24 -600 -200 100 R 40 40 0 0 B 
+X EXP 25 600 -500 100 L 40 40 0 0 I 
+X INT 12 600 300 100 L 40 40 0 0 O 
+X REGOUT 10 600 -300 100 L 40 40 0 0 P 
+X CPOUT 20 600 -200 100 L 40 40 0 0 P 
+X RESV 22 600 200 100 L 40 40 0 0 P 
+X VLOGIC 8 600 400 100 L 40 40 0 0 I 
+X VDD 13 600 500 100 L 40 40 0 0 I 
+X GND 18 600 -600 100 L 40 40 0 0 I 
+X RESV@1 19 600 100 100 L 40 40 0 0 P 
+X RESV@2 21 600 0 100 L 40 40 0 0 P 
+ENDDRAW
+ENDDEF
+#
+# End Library

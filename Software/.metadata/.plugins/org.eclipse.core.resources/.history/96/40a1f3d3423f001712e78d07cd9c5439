@@ -1,0 +1,19 @@
+#ifndef _CHARGER_H_
+#define _CHARGER_H_
+
+class Charger
+{
+public:
+	void Init();
+
+private:
+	struct ADCMeasurements
+	{
+		uint16_t I;
+		uint16_t U;
+	} adc;
+};
+
+extern Charger sCharger;
+
+#endif

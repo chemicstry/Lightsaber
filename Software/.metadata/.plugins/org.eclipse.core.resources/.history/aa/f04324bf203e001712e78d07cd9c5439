@@ -1,0 +1,148 @@
+#include "LED.h"
+
+#include "math.h"
+
+#include "../Timer/Timer.h"
+
+#include "diag/trace.h"
+
+/*void hsi2rgb(float H, float S, float I, uint8_t* rgb) {
+  int r, g, b;
+  H = fmod(H,360); // cycle H around to 0-360 degrees
+  H = 3.14159*H/(float)180; // Convert to radians.
+  S = S>0?(S<1?S:1):0; // clamp S and I to interval [0,1]
+  I = I>0?(I<1?I:1):0;
+
+  // Math! Thanks in part to Kyle Miller.
+  if(H < 2.09439) {
+    r = 255*I/3*(1+S*cos(H)/cos(1.047196667-H));
+    g = 255*I/3*(1+S*(1-cos(H)/cos(1.047196667-H)));
+    b = 255*I/3*(1-S);
+  } else if(H < 4.188787) {
+    H = H - 2.09439;
+    g = 255*I/3*(1+S*cos(H)/cos(1.047196667-H));
+    b = 255*I/3*(1+S*(1-cos(H)/cos(1.047196667-H)));
+    r = 255*I/3*(1-S);
+  } else {
+    H = H - 4.188787;
+    b = 255*I/3*(1+S*cos(H)/cos(1.047196667-H));
+    r = 255*I/3*(1+S*(1-cos(H)/cos(1.047196667-H)));
+    g = 255*I/3*(1-S);
+  }
+  rgb[0]=r;
+  rgb[1]=g;
+  rgb[2]=b;
+}*/
+
+void LED::Init()
+{
+    RCC_APB2PeriphClockCmd(LED_TIMER_PERIPH | LED_PORT_PERIPH, ENABLE);
+
+    TIM_TimeBaseInitTypeDef timerInitStructure;
+    TIM_TimeBaseStructInit(&timerInitStructure);
+    timerInitStructure.TIM_Prescaler = 62;
+    timerInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
+    timerInitStructure.TIM_Period = 0x100;
+    timerInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+    timerInitStructure.TIM_RepetitionCounter = 0;
+    TIM_TimeBaseInit(LED_TIMER, &timerInitStructure);
+
+    TIM_OCInitTypeDef TIM_OCInitStructure;
+    TIM_OCStructInit(&TIM_OCInitStructure);
+    TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM2;
+    TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
+    TIM_OCInitStructure.TIM_OutputNState = TIM_OutputNState_Enable;
+    TIM_OCInitStructure.TIM_Pulse = 0;
+    TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_Low;
+    TIM_OCInitStructure.TIM_OCNPolarity = TIM_OCNPolarity_Low;
+    TIM_OCInitStructure.TIM_OCIdleState = TIM_OCIdleState_Set;
+    TIM_OCInitStructure.TIM_OCNIdleState = TIM_OCIdleState_Reset;
+
+    TIM_OC1Init(LED_TIMER, &TIM_OCInitStructure);
+    TIM_OC1PreloadConfig(LED_TIMER, TIM_OCPreload_Enable);
+    TIM_OC2Init(LED_TIMER, &TIM_OCInitStructure);
+    TIM_OC2PreloadConfig(LED_TIMER, TIM_OCPreload_Enable);
+    TIM_OC3Init(LED_TIMER, &TIM_OCInitStructure);
+    TIM_OC3PreloadConfig(LED_TIMER, TIM_OCPreload_Enable);
+
+    TIM_BDTRInitTypeDef TIM_BDTRInitStructure;
+    TIM_BDTRStructInit(&TIM_BDTRInitStructure);
+    TIM_BDTRInitStructure.TIM_OSSRState = TIM_OSSRState_Enable;
+    TIM_BDTRInitStructure.TIM_OSSIState = TIM_OSSIState_Enable;
+    TIM_BDTRInitStructure.TIM_LOCKLevel = TIM_LOCKLevel_OFF;
+    TIM_BDTRInitStructure.TIM_DeadTime = 0;
+    TIM_BDTRInitStructure.TIM_Break = TIM_Break_Disable;
+    TIM_BDTRInitStructure.TIM_BreakPolarity = TIM_BreakPolarity_High;
+    TIM_BDTRInitStructure.TIM_AutomaticOutput = TIM_AutomaticOutput_Enable;
+    TIM_BDTRConfig(LED_TIMER, &TIM_BDTRInitStructure);
+
+    GPIO_InitTypeDef GPIO_InitStructure;
+    GPIO_InitStructure.GPIO_Pin = LED_R_PIN | LED_G_PIN | LED_B_PIN;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+    GPIO_Init(LED_PORT, &GPIO_InitStructure);
+
+    //TIM_ARRPreloadConfig(LED_TIMER, ENABLE);
+    TIM_Cmd(LED_TIMER, ENABLE);
+    TIM_CtrlPWMOutputs(LED_TIMER, ENABLE);
+}
+
+void LED::Save(const Color& color)
+{
+	color.GetRGB(_rgb);
+	Set(_rgb);
+}
+
+void LED::Set(const Color& color)
+{
+	uint8_t rgb[3];
+	color.GetRGB(rgb);
+	Set(rgb);
+}
+
+void LED::Set(const uint8_t rgb[])
+{
+	TIM_SetCompare1(LED_TIMER, rgb[1]);
+	TIM_SetCompare2(LED_TIMER, rgb[0]);
+	TIM_SetCompare3(LED_TIMER, rgb[2]);
+}
+
+void LED::Blink(const Color& color, uint32_t count, uint32_t delay)
+{
+	for (uint32_t i = 0; i < count; ++i)
+	{
+		Set(color);
+		Timer::DelayMS(delay);
+		Set(RGB(0, 0, 0));
+		Timer::DelayMS(delay);
+	}
+}
+
+void LED::BlinkAsync(Color& color, void (*cb)(), uint32_t count, uint32_t delay)
+{
+	static uint32_t _count = count*2;
+	static auto _cb = cb;
+	static Color& _color = color;
+
+	trace_printf("Blink");
+
+	int t = Timer::SetInterval([&](){
+		trace_printf("Timer %u\n", _count);
+		if (_count % 2)
+			Set(_color);
+		else
+			Set(RGB(0, 0, 0));
+
+		if (!_count--)
+		{
+			Timer::ClearTimeout(t);
+
+			if (_cb)
+				_cb();
+		}
+	}, delay);
+}
+
+// Global variable
+LED sLed;
+

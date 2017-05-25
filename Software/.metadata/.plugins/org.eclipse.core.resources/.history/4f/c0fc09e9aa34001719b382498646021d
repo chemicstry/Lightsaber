@@ -1,0 +1,21 @@
+#ifndef _MAX17205_H_
+#define _MAX17205_H_
+
+#include "../I2Cdev/I2Cdev.h"
+
+#define MAX17205_ADDR_LOW 0x36
+#define MAX17205_ADDR_HIGH 0x0B
+
+class MAX17205
+{
+public:
+    void Init();
+
+    float GetInternalTemp();
+
+//private:
+    uint16_t ReadReg(uint16_t reg);
+    void WriteReg(uint16_t reg, uint16_t val);
+};
+
+#endif

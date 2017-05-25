@@ -1,0 +1,7 @@
+(fp_lib_table
+  (lib (name HC-05)(type Legacy)(uri "$(KIPRJMOD)/HC-05.mod")(options "")(descr ""))
+  (lib (name MPU-6050)(type Legacy)(uri "$(KIPRJMOD)/MPU-6050.mod")(options "")(descr ""))
+  (lib (name TPA2005D1DGN)(type Legacy)(uri "$(KIPRJMOD)/TPA2005D1DGN.mod")(options "")(descr ""))
+  (lib (name S-PWSON-N8)(type Legacy)(uri "$(KIPRJMOD)/S-PWSON-N8.mod")(options "")(descr ""))
+  (lib (name kicad2)(type KiCad)(uri "$(KIPRJMOD)")(options "")(descr ""))
+)

@@ -1,0 +1,246 @@
+//
+// This file is part of the GNU ARM Eclipse distribution.
+// Copyright (c) 2014 Liviu Ionescu.
+//
+
+// ----------------------------------------------------------------------------
+
+#include <stdio.h>
+#include <stdlib.h>
+#include "diag/Trace.h"
+
+#include "stm32f10x.h"
+
+#include "Timer/Timer.h"
+#include "I2Cdev/I2C.h"
+#include "I2Cdev/I2Cdev.h"
+#include "MPU6050/MPU6050.h"
+#include "MAX17205/MAX17205.h"
+#include "LED/LED.h"
+#include "BT/BT.h"
+#include "fatfs/ff.h"
+
+
+// ----------------------------------------------------------------------------
+//
+// Semihosting STM32F1 empty sample (trace via DEBUG).
+//
+// Trace support is enabled by adding the TRACE macro definition.
+// By default the trace messages are forwarded to the DEBUG output,
+// but can be rerouted to any device or completely suppressed, by
+// changing the definitions required in system/src/diag/trace_impl.c
+// (currently OS_USE_TRACE_ITM, OS_USE_TRACE_SEMIHOSTING_DEBUG/_STDOUT).
+//
+
+// ----- main() ---------------------------------------------------------------
+
+// Sample pragmas to cope with warnings. Please note the related line at
+// the end of this function, used to pop the compiler diagnostics status.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wmissing-declarations"
+#pragma GCC diagnostic ignored "-Wreturn-type"
+
+MPU6050 gyro;
+LED led;
+
+int16_t ax, ay, az;
+int16_t gx, gy, gz;
+
+void Test()
+{
+    static double h = 0;
+    //trace_printf("Testcon: %u\n", gyro.getRate());
+    gyro.getAcceleration(&ax, &ay, &az);
+    //trace_printf("%i, %i, %i\n", ax, ay, az);
+    h += (double(ay)/65025.0 + 0.5 - h)*0.1;
+    led.SetHSL(h, 1, 0.5);
+}
+
+#define STEP 128
+
+void LEDPWM()
+{
+    static double h = 0;
+
+    if (h >= 1.0)
+        h = 0;
+    else
+        h += 0.01;
+
+    led.SetHSL(h, 1, 0.5);
+}
+
+void BTTEST()
+{
+    BT& bt = BT::getInstance();
+    bt.Send("AT\r\n");
+
+}
+
+void BTTEST2()
+{
+    BT& bt = BT::getInstance();
+}
+
+void BTRX(uint8_t* data, uint32_t len)
+{
+	trace_printf("BTRX: %u\n", len);
+
+	switch(data[0])
+	{
+	case 'R':
+		led.SetRGB(255, 0, 0);
+		break;
+	case 'G':
+		led.SetRGB(0, 255, 0);
+		break;
+	case 'B':
+		led.SetRGB(0, 0, 255);
+		break;
+	default:
+		led.SetRGB(0, 0, 0);
+	}
+}
+
+FRESULT scan_files (
+    char* path        /* Start node to be scanned (***also used as work area***) */
+)
+{
+    FRESULT res;
+    DIR dir;
+    UINT i;
+    static FILINFO fno;
+
+
+    res = f_opendir(&dir, path);                       /* Open the directory */
+    if (res == FR_OK) {
+        for (;;) {
+            res = f_readdir(&dir, &fno);                   /* Read a directory item */
+            if (res != FR_OK || fno.fname[0] == 0) break;  /* Break on error or end of dir */
+            if (fno.fattrib & AM_DIR) {                    /* It is a directory */
+                i = strlen(path);
+                sprintf(&path[i], "/%s", fno.fname);
+                res = scan_files(path);                    /* Enter the directory */
+                if (res != FR_OK) break;
+                path[i] = 0;
+            } else {                                       /* It is a file. */
+            	trace_printf("%s/%s\n", path, fno.fname);
+            }
+        }
+        f_closedir(&dir);
+    }
+
+    return res;
+}
+
+bool CheckI2CAddress(I2C_TypeDef* I2Cx, uint8_t slaveAddress)
+{
+	// Wait until I2C module is idle:
+	//while(I2C_GetFlagStatus(I2Cx, I2C_FLAG_BUSY));
+
+	// Generate the start condition
+	I2C_GenerateSTART(I2Cx, ENABLE);
+	//
+	while(!I2C_CheckEvent(I2Cx, I2C_EVENT_MASTER_MODE_SELECT));
+
+	//Send the address of the slave to be contacted:
+	I2C_Send7bitAddress(I2Cx, slaveAddress<<1, I2C_Direction_Transmitter);
+
+	//If this is a write operation, set I2C for transmit
+	uint32_t timeout = 0xFFF;
+	while (!I2C_CheckEvent(I2Cx, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED))
+	{
+		if (--timeout == 0)
+			break;
+	}
+
+	if (timeout == 0)
+		return false;
+	else
+		return true;
+}
+
+int
+main(int argc, char* argv[])
+{
+    // At this stage the system clock should have already been configured
+    // at high speed.
+
+    trace_printf("System clock: %u Hz\n", SystemCoreClock);
+    Timer::Start();
+
+    trace_printf("I2C Init\n");
+    //led.SetVal(255, 255, 255);
+
+    I2C1_Initialize();
+
+    for (int i = 0; i < 0x7F; ++i)
+    {
+    	if (CheckI2CAddress(I2C1, i))
+    		trace_printf("Addr: %u\n", i);
+    }
+
+    gyro.initialize();
+    BT::getInstance().Init();
+    BT::getInstance().SetRXCB(BTRX);
+    BT::getInstance().SetCMDMode(false);
+
+    trace_printf("Waiting\n");
+
+    trace_printf("Testcon: %u\n", gyro.getDeviceID());
+
+    led.Init();
+    //Timer::SetInterval(Test, 10);
+    //Timer::SetInterval(LEDPWM, 10);
+    //Timer::SetInterval(BTTEST, 1000);
+    //Timer::SetInterval(BTTEST2, 1200);
+
+    MAX17205 max;
+    uint16_t devName = max.ReadReg(0x21);
+    trace_printf("DevName: %u\nName: %u\nRev: %u\n", devName, devName & 0xF, devName >> 4);
+    devName = max.ReadReg(0x21);
+        trace_printf("DevName: %u\nName: %u\nRev: %u\n", devName, devName & 0xF, devName >> 4);
+
+    //uint16_t temp = max.ReadReg(0x135);
+    //trace_printf("Temp: %u, Cal: %f\n", temp, float(temp)*0.1 - 273);
+
+    FATFS fs;
+	FIL fil;       /* File object */
+	char line[82]; /* Line buffer */
+	FRESULT fr;    /* FatFs return code */
+
+	int status = f_mount(&fs, "0", 1);
+
+	if (status != FR_OK)
+	{
+		trace_printf("Mount failed! %u\n", status);
+		return 0;
+	}
+
+	/* Open a text file */
+	fr = f_open(&fil, "hello.txt", FA_READ);
+	if (fr) return (int)fr;
+
+	/* Read all lines and display it */
+	while (f_gets(line, sizeof(line), &fil))
+		trace_printf(line);
+
+	/* Close the file */
+	f_close(&fil);
+
+	char path[] = "/";
+	scan_files(path);
+
+    while(1)
+    {
+        Timer::FireCallbacks();
+        BT::getInstance().Update();
+    }
+
+    return 0;
+}
+
+#pragma GCC diagnostic pop
+
+// ----------------------------------------------------------------------------

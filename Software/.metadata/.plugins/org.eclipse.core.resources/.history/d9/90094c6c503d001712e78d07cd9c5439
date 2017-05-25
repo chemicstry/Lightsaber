@@ -1,0 +1,11 @@
+#ifndef _AUDIO_SOURCE_H_
+#define _AUDIO_SOURCE_H_
+
+class AudioSource
+{
+public:
+	virtual void Read(void* buf, uint32_t size) = 0;
+	virtual bool EOF() = 0;
+};
+
+#endif

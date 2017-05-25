@@ -1,0 +1,97 @@
+#include "stm32f10x.h"
+#include "stm32f10x_gpio.h"
+#include "stm32f10x_rcc.h"
+#include "stm32f10x_i2c.h"
+#include "I2C.h"
+
+#define Timed(x) Timeout = 0xFFFF; while (x) { /*if (Timeout-- == 0) break;*/}
+
+void I2C1_Initialize(void)
+{
+	// Enable the GPIOB, I2C1 and AFIO modules.
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB,ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C1, ENABLE);
+
+	I2C_InitTypeDef  I2C_InitStructure;
+	I2C_InitStructure.I2C_ClockSpeed = 50000;    //Bus clock speed 100kbps
+	I2C_InitStructure.I2C_Mode = I2C_Mode_I2C;
+	I2C_InitStructure.I2C_DutyCycle = I2C_DutyCycle_2;
+	// Setup I2C BUS master properties:
+	I2C_InitStructure.I2C_OwnAddress1 = 0x00;
+	I2C_InitStructure.I2C_Ack = I2C_Ack_Enable;
+	I2C_InitStructure.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
+	// Finally initialize the I2C1 unit using the "i2c" structure.
+	I2C_Init(I2C1, &I2C_InitStructure);
+
+	GPIO_InitTypeDef GPIO_InitStructure;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_7;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_OD;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+	// Enable the I2C1 module:
+	I2C_Cmd(I2C1, ENABLE);
+}
+
+/*******************************************************************/
+void I2C_StartTransmission(I2C_TypeDef* I2Cx, uint8_t transmissionDirection,  uint8_t slaveAddress)
+{
+	uint32_t Timeout = 0;
+	// Wait until I2C module is idle:
+	//while(I2C_GetFlagStatus(I2Cx, I2C_FLAG_BUSY));
+
+	// Generate the start condition
+	I2C_GenerateSTART(I2Cx, ENABLE);
+	//
+	while(!I2C_CheckEvent(I2Cx, I2C_EVENT_MASTER_MODE_SELECT));
+
+	//Send the address of the slave to be contacted:
+	I2C_Send7bitAddress(I2Cx, slaveAddress<<1, transmissionDirection);
+
+	//If this is a write operation, set I2C for transmit
+	if(transmissionDirection== I2C_Direction_Transmitter)
+	{
+		Timed(!I2C_CheckEvent(I2Cx, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED));
+	}
+
+	//Or if a read operation, set i2C for receive
+	if(transmissionDirection== I2C_Direction_Receiver)
+	{
+		Timed(!I2C_CheckEvent(I2Cx, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED));
+	}
+}
+
+/*******************************************************************/
+void I2C_WriteData(I2C_TypeDef* I2Cx, uint8_t data)
+{
+	uint32_t Timeout = 0;
+
+	// Write the data on the bus
+	I2C_SendData(I2Cx, data);
+	//Wait until transmission is complete:
+	Timed(!I2C_CheckEvent(I2Cx, I2C_EVENT_MASTER_BYTE_TRANSMITTED));
+}
+
+
+
+/*******************************************************************/
+uint8_t I2C_ReadData(I2C_TypeDef* I2Cx)
+{
+	uint32_t Timeout = 0;
+
+	// Wait until receive is completed
+	Timed(!I2C_CheckEvent(I2Cx, I2C_EVENT_MASTER_BYTE_RECEIVED));
+
+	// Read one byte of data from I2c
+	return I2C_ReceiveData(I2Cx);
+}
+
+void I2C_Stop(I2C_TypeDef* I2Cx)
+{
+	uint32_t Timeout = 0;
+
+    I2C_GenerateSTOP(I2Cx, ENABLE);
+
+    Timed(I2C_GetFlagStatus(I2Cx, I2C_FLAG_STOPF));
+}

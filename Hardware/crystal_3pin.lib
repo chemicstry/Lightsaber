@@ -1,0 +1,19 @@
+EESchema-LIBRARY Version 2.3
+#encoding utf-8
+#
+# Crystal_3PIN
+#
+DEF Crystal_3PIN U 0 40 Y Y 1 F N
+F0 "U" -50 -250 60 H V C CNN
+F1 "Crystal_3PIN" 100 250 60 H V C CNN
+F2 "" 0 0 60 H I C CNN
+F3 "" 0 0 60 H I C CNN
+DRAW
+S 250 200 -100 -200 0 1 0 N
+X OSC1 1 450 100 200 L 50 50 1 1 I
+X GND 2 450 0 200 L 50 50 1 1 I
+X OSC2 3 450 -100 200 L 50 50 1 1 I
+ENDDRAW
+ENDDEF
+#
+#End Library

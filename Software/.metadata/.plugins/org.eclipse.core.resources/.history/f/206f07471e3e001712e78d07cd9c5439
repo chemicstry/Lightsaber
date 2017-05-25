@@ -1,0 +1,51 @@
+#ifndef TIMER_H_
+#define TIMER_H_
+
+#include "stm32f10x.h"
+
+#include <functional>
+
+#define MAX_TIMERS 10
+#define NO_TIMER_AVAILABLE -1
+
+enum EventType:u8
+{
+    EVENT_NONE          = 0,
+    EVENT_SINGLE        = 1,
+    EVENT_INTERVAL      = 2
+};
+
+typedef std::function<void()> TimerCB;
+
+struct Event
+{
+    EventType   Type;
+    TimerCB		CB;
+    int32_t     Expires;
+    int32_t     Period;
+};
+
+class Timer
+{
+public:
+    static void Start();
+    static int32_t SetTimeout(TimerCB cb, int32_t delay_ms);
+    static int32_t SetInterval(TimerCB cb, int32_t delay_ms);
+    static void ClearTimeout(uint32_t id);
+    static void Update(uint32_t diff_ms);
+    static void FireCallbacks();
+    static uint32_t Millis();
+    static uint32_t Micros();
+    static void DelayMS(uint32_t ms);
+    static void DelayUS(uint32_t us);
+
+private:
+    static __IO uint32_t millis;
+    static int32_t getFreeSlot();
+    static Event timers[MAX_TIMERS];
+};
+
+uint32_t millis();
+uint32_t micros();
+
+#endif

@@ -1,0 +1,21 @@
+#ifndef _CHARGER_H_
+#define _CHARGER_H_
+
+#define CHARGER_BOOST_FREQ 250000 // 250 kHz
+
+class Charger
+{
+public:
+	void Init();
+
+private:
+	struct ADCMeasurements
+	{
+		uint16_t I;
+		uint16_t U;
+	} ADC;
+};
+
+extern Charger sCharger;
+
+#endif

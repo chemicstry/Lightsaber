@@ -1,0 +1,14 @@
+#ifndef _AUDIO_H_
+#define _AUDIO_H_
+
+class Audio
+{
+public:
+	void Init();
+	void LowLevelInit();
+	void SetSamplingFreq(uint32_t freq);
+};
+
+extern Audio sAudio;
+
+#endif

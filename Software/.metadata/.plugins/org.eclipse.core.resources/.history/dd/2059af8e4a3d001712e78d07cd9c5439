@@ -1,0 +1,20 @@
+#ifndef _AUDIO_H_
+#define _AUDIO_H_
+
+#include "stm32f10x.h"
+
+#define AMP_CTRL_PORT GPIOA
+#define AMP_CTRL_PIN GPIO_Pin_5
+
+class Audio
+{
+public:
+	void Init();
+	void LowLevelInit();
+	void SetSamplingFreq(uint32_t freq);
+	void SetAudioAmp(bool en);
+};
+
+extern Audio sAudio;
+
+#endif

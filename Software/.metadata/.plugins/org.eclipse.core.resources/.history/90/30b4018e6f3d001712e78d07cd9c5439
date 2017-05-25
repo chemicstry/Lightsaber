@@ -1,0 +1,9 @@
+#include "Power.h"
+
+// Global var
+Power sPower;
+
+Power::Power()
+{
+
+}
